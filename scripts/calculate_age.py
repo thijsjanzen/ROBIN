@@ -60,11 +60,11 @@ def calc_age_contigs(hybrid_result,
         local_indices = hdf5_operations.get_contig_indices(contig_indices, contig)
         geno = np.full(len(local_indices), -1)
 
-        geno[hybrid_result['11'][local_indices] > (1 - threshold)] = 0
+        geno[hybrid_result['11'][local_indices] >= (1 - threshold)] = 0
         if sample_number == 2:
-            geno[hybrid_result['02'][local_indices] > (1 - threshold)] = 1
+            geno[hybrid_result['02'][local_indices] >= (1 - threshold)] = 1
         else:
-            geno[hybrid_result['20'][local_indices] > (1 - threshold)] = 1
+            geno[hybrid_result['20'][local_indices] >= (1 - threshold)] = 1
 
         informative_markers = geno >= 0
 
@@ -77,7 +77,8 @@ def calc_age_contigs(hybrid_result,
             total_number_of_junctions += number_of_junctions_in_contig
 
             marker_locations -= min(marker_locations)
-            marker_locations += max(all_markers)
+            if(len(all_markers) > 0):
+                marker_locations += max(all_markers)
 
             all_markers = np.concatenate((all_markers, marker_locations))
 
@@ -180,14 +181,25 @@ def infer_age_contigs(input_panel, all_names, chromosome_size_in_bp,
 def infer_ages_scaffolds(input_panel, all_names, total_chromosome_size, anc_1_frequency, ancestry_hmm_path):
     hybrid_names = hdf5_operations.extract_sample_names(all_names, 'Hybrid')
 
-    hybrid_panel = input_panel[:, range(6, len(input_panel[0, ]))]
+    hybrid_panel = input_panel[:, range(7, len(input_panel[0, ]))]
     allele_matrix = input_panel[:, range(1, 6)]
 
     for i in range(0, len(hybrid_names)):
         local_hybrid_panel = hybrid_panel[:, [(i * 2), (i * 2) + 1]]
 
-        local_chrom_indic = input_panel[:, 1]
+        local_chrom_indic = input_panel[:, 0]
         output = np.column_stack((local_chrom_indic, allele_matrix, allele_matrix[:, 0], local_hybrid_panel))
+
+        to_remove = []
+        for k in range(0, len(output[:, 0])):
+            for l in range(0, len(output[k, ])):
+                if output[k, l] != output[k, l]:  # isnan
+                    to_remove.append(k)
+                    break
+
+        if len(to_remove) > 0:
+            output = np.delete(output, to_remove, 0)
+            local_hybrid_panel = np.delete(local_hybrid_panel, to_remove, 0)
 
         # now we have to remove all entries where there was no hybrid alleles
         allele_counts = local_hybrid_panel.sum(1)
@@ -195,8 +207,12 @@ def infer_ages_scaffolds(input_panel, all_names, total_chromosome_size, anc_1_fr
 
         diff_pos = np.diff(output[:, 1]) / total_chromosome_size
         diff_pos = np.insert(diff_pos, 0, -1)
-        # output[:, 6] = diff_pos
+        
+	print(diff_pos)
+	
         output2 = np.column_stack((output[:, [0, 1, 2, 3, 4, 5]], diff_pos, output[:, [7, 8]]))
+	print(output2[0,:])
+	print(output2)
 
         file_name = "hybrid_input_" + str(i) + ".txt"
         np.savetxt(fname=file_name, X=output2, fmt='%i %i %i %i %i %i %.20f %i %i')
@@ -223,11 +239,11 @@ def infer_ages_scaffolds(input_panel, all_names, total_chromosome_size, anc_1_fr
         for threshold in [0, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]:
             geno = np.full(len(hybrid_result), -1)
 
-            geno[hybrid_result['11'] > (1 - threshold)] = 0
+            geno[hybrid_result['11'] >= (1 - threshold)] = 0
             if i == 2:
-                geno[hybrid_result['02'] > (1 - threshold)] = 1
+                geno[hybrid_result['02'] >= (1 - threshold)] = 1
             else:
-                geno[hybrid_result['20'] > (1 - threshold)] = 1
+                geno[hybrid_result['20'] >= (1 - threshold)] = 1
 
             informative_markers = geno >= 0
             geno = geno[informative_markers]

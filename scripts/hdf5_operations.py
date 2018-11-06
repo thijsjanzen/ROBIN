@@ -334,7 +334,7 @@ def create_input_panel(local_callset, all_names, max_dp, min_gq, min_alleles,
 
     hybrid_panel = hybrid_panel[markers_to_keep, ]
 
-    output = np.column_stack((chrom_indicator, allele_matrix3, hybrid_panel))
+    output = np.column_stack((chrom_indicator, allele_matrix3, positions[markers_to_keep], hybrid_panel))
     return output
 
 
@@ -344,11 +344,10 @@ def read_existing_panel(panel_path, hybrid_names):
     num_columns = 7 + 2 * len(hybrid_names)
     while len(contig_array[0, ]) > num_columns:
         contig_array = np.delete(contig_array, -1 + len(contig_array[0, ]), 1)
-        contig_array = np.delete(contig_array, -1 + len(contig_array[0, ]), 1)
     return contig_array
 
 
-def create_panel(callset, panel_path, all_samples, max_dp, min_gq, min_alleles, analysis):
+def create_panel(hdf5_path, panel_path, all_samples, max_dp, min_gq, min_alleles, analysis):
     hybrid_names = extract_sample_names(all_samples, 'Hybrid')
 
     if os.path.exists(panel_path):
@@ -356,6 +355,7 @@ def create_panel(callset, panel_path, all_samples, max_dp, min_gq, min_alleles, 
         return read_existing_panel(panel_path, hybrid_names)
     else:
         print("previous panel file not found or provided, generating new panel file")
+        callset = h5py.File(hdf5_path, mode='r')
         contig_array = create_input_panel(callset, all_samples, max_dp, min_gq, min_alleles, analysis)
         file_fmt = '%s %i %i %i %i %i %.20f '
         for x in range(0, len(hybrid_names)):
