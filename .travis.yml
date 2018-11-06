@@ -7,6 +7,7 @@ python:
 # command to install dependencies
 install:
   - pip install -r requirements.txt
+  - make build
 # command to run tests
-#script:
-#  - pytest
+script:
+    - echo "TODO"
