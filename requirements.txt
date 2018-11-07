@@ -1,0 +1,7 @@
+numpy
+pandas
+scikit-allel
+scikit-optimize
+h5py
+configparser
+progressbar
