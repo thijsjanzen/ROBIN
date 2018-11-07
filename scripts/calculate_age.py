@@ -49,7 +49,7 @@ def calc_age_contigs(hybrid_result,
                      initial_heterozygosity,
                      chromosome_size_in_bp,
                      chromosome_size_in_morgan,
-                     sample_number):
+                     ancestor_type):
 
     contig_list = find_contig_order(contig_indices)
 
@@ -61,7 +61,7 @@ def calc_age_contigs(hybrid_result,
         geno = np.full(len(local_indices), -1)
 
         geno[hybrid_result['11'][local_indices] >= (1 - threshold)] = 0
-        if sample_number == 2:
+        if ancestor_type == 2:
             geno[hybrid_result['02'][local_indices] >= (1 - threshold)] = 1
         else:
             geno[hybrid_result['20'][local_indices] >= (1 - threshold)] = 1
@@ -94,6 +94,11 @@ def calc_age_contigs(hybrid_result,
     return ages
 
 
+def get_ancestor_types(array):
+    indices = array[:, 1] == 'Hybrid'
+    return array[indices, 2]
+
+
 def infer_age_contigs(input_panel, all_names, chromosome_size_in_bp,
                       anc_1_frequency, chrom, contig_index, ancestry_hmm_path):
     # now we have the basics of the inputfile for ANCESTRY_HMM
@@ -102,6 +107,8 @@ def infer_age_contigs(input_panel, all_names, chromosome_size_in_bp,
 
     hybrid_panel = input_panel[:, range(7, len(input_panel[0, ]))]
     allele_matrix = input_panel[:, range(1, 6)]
+
+    ancestor_types = get_ancestor_types(all_names)
 
     for i in range(0, len(hybrid_names)):
         local_hybrid_panel = hybrid_panel[:, [(i * 2), (i * 2) + 1]]
@@ -168,7 +175,7 @@ def infer_age_contigs(input_panel, all_names, chromosome_size_in_bp,
                                           initial_heterozygosity,
                                           chromosome_size_in_bp,
                                           chromosome_size_in_morgan,
-                                          i)
+                                          ancestor_types[i])
 
             popsize = [1000, 10000, 100000, 1000000]
             f = open("output.txt", "a")
@@ -183,6 +190,8 @@ def infer_ages_scaffolds(input_panel, all_names, total_chromosome_size, anc_1_fr
 
     hybrid_panel = input_panel[:, range(7, len(input_panel[0, ]))]
     allele_matrix = input_panel[:, range(1, 6)]
+
+    ancestor_types = get_ancestor_types(all_names)
 
     for i in range(0, len(hybrid_names)):
         local_hybrid_panel = hybrid_panel[:, [(i * 2), (i * 2) + 1]]
@@ -240,7 +249,7 @@ def infer_ages_scaffolds(input_panel, all_names, total_chromosome_size, anc_1_fr
             geno = np.full(len(hybrid_result), -1)
 
             geno[hybrid_result['11'] >= (1 - threshold)] = 0
-            if i == 2:
+            if ancestor_types[i] == 2:
                 geno[hybrid_result['02'] >= (1 - threshold)] = 1
             else:
                 geno[hybrid_result['20'] >= (1 - threshold)] = 1
@@ -274,6 +283,8 @@ def infer_ages_within_contigs(input_panel, all_names, chromosome_size_in_bp, anc
 
     hybrid_panel = input_panel[:, range(7, len(input_panel[0, ]))]
     allele_matrix = input_panel[:, range(1, 6)]
+
+    ancestor_types = get_ancestor_types(all_names)
 
     for i in range(0, len(hybrid_names)):
         local_hybrid_panel = hybrid_panel[:, [(i * 2), (i * 2) + 1]]
@@ -345,7 +356,7 @@ def infer_ages_within_contigs(input_panel, all_names, chromosome_size_in_bp, anc
                                           initial_heterozygosity,
                                           chromosome_size_in_bp,
                                           chromosome_size_in_morgan,
-                                          i)
+                                          ancestor_types[i])
 
             popsizes = [1000, 10000, 100000, 1000000]
             f = open("output.txt", "a")

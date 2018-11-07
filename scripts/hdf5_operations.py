@@ -71,9 +71,19 @@ def subsample(v, local_limit):
 
     return output
 
+def read_sample_file(file_name):
+    all_names = np.loadtxt(file_name, dtype='str')
+    for i in range(0, len(all_names[:, 1])):
+        x = all_names[i, 1]
+        x = x.lower()
+        all_names[i, 1] = x
+    return all_names
+
 
 def extract_sample_names(array, name):
     indices = array[:, 1] == name
+    if len(indices) < 1:
+        indices = array[:, 1] == name.lower()
     return array[indices, 0]
 
 

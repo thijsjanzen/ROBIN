@@ -2,7 +2,6 @@ import numpy as np
 import os
 import configparser
 import pandas
-import h5py
 
 import hdf5_operations
 import contig_analysis
@@ -37,7 +36,7 @@ def main(config_path, random_seed):
     hdf5_path = config['File Names']['hdf5_file']
     panel_path = config['File Names']['panel_file']
     genome_size_file = config['File Names']['genome_size_file']
-    all_names = np.loadtxt(config['File Names']['sample_list'], dtype='str')
+    all_names = hdf5_operations.read_sample_file(config['File Names']['sample_list'])
     ancestry_hmm_path = config['File Names']['ancestry_hmm']
     contig_assignment_path = config['File Names']['contig_assignment_file']
 
