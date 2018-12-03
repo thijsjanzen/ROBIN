@@ -15,22 +15,33 @@ def calc_genome_size(local_contig_array):
     cnt = 1
     for local_contig in unique_contigs:
         indices = hdf5_operations.get_contig_indices(local_contig_column[:], local_contig)
+
         contig_pos = local_contig_array[:, 1]
         contig_pos = contig_pos[indices]
-        rel_distance = contig_pos - min(contig_pos)
-        total_bp += max(rel_distance)
+
+        to_remove = []
+        for i in range(0, len(contig_pos)):
+            if contig_pos[i] != contig_pos[i]:
+                to_remove.append(i)
+
+        if len(to_remove) > 0:
+            contig_pos = np.delete(contig_pos, to_remove, 0)
+
+        if len(contig_pos) > 0:
+            rel_distance = 0
+            if len(indices) > 1:
+                rel_distance = contig_pos - min(contig_pos)
+                total_bp += max(rel_distance)
+            if len(indices) == 1:
+                total_bp += contig_pos[0]
+
         bar.update(cnt)
         cnt += 1
 
     return total_bp
 
 
-def contigs_no_assembly(contig_array, all_samples,
-                        genome_size_file, num_chromosomes, init_ratio,
-                        ancestry_hmm_path):
-
-    hybrid_names = hdf5_operations.extract_sample_names(all_samples, 'Hybrid')
-
+def obtain_genome_size(genome_size_file, contig_array):
     genome_size = -1
     if os.path.exists(genome_size_file):
         input_file = open(genome_size_file, 'r')
@@ -47,6 +58,108 @@ def contigs_no_assembly(contig_array, all_samples,
         output_file.write(str(genome_size))
         output_file.close()
 
+    return genome_size
+
+
+def create_chromosome(remaining_contigs,
+                      contig_array,
+                      hybrid_names):
+
+    contig_names = []
+    chrom_bp = 0
+    chromosome = np.empty((0, 7 + 2 * len(hybrid_names)))
+
+    for contig_iterator in range(0, len(remaining_contigs)):
+        focal_contig = remaining_contigs[contig_iterator]
+        contig_indices = hdf5_operations.get_contig_indices(contig_array[:, 0], focal_contig)
+        # now we have to get a formatted input panel for these rows
+
+        local_contig_panel = contig_array[contig_indices, ]
+
+        if len(local_contig_panel[:, 0]) > 1:
+
+            contig_name = np.full(len(local_contig_panel[:, 0]), focal_contig)
+
+            contig_positions = local_contig_panel[:, 1]
+            contig_positions = contig_positions - min(contig_positions) + 1
+            local_contig_panel[:, 0] = 1
+            local_contig_panel[:, 1] = contig_positions + chrom_bp
+            local_contig_panel[:, 6] = contig_positions + chrom_bp
+
+            contig_size = max(contig_positions)
+            chrom_bp += contig_size
+
+            chromosome = np.vstack((chromosome, local_contig_panel))
+            contig_names = np.concatenate((contig_names, contig_name), axis=None)
+
+    return chromosome, contig_names, chrom_bp
+
+
+def chrom_contig_list(contig_list, chrom):
+    indices = contig_list[:, 0] == chrom
+    return contig_list[indices, 1]
+
+
+def contigs_with_assembly(contig_array,
+                          contig_chrom_assignment,
+                          all_names,
+                          anc_1_frequency,
+                          ancestry_hmm_path):
+
+    hybrid_names = hdf5_operations.extract_sample_names(all_names, 'Hybrid')
+
+    number_of_chromosomes = len(np.unique(contig_chrom_assignment[:, 0]))
+
+    for chrom in range(0, number_of_chromosomes):
+        print("Analyzing Chromosome  " + str(chrom))
+        # take subset of panel with only matching contigs
+        remaining_contigs = chrom_contig_list(contig_chrom_assignment, chrom)
+
+        np.random.shuffle(remaining_contigs)
+
+        results = create_chromosome(remaining_contigs, contig_array, hybrid_names)
+        chromosome = results[0]
+        contig_names = results[1]
+        genome_size = results[2]
+
+        map_length = 1.0  # this could be changed depending on input by the user
+
+        calculate_age.infer_age_contigs(chromosome, all_names,
+                                        genome_size, map_length,
+                                        anc_1_frequency,
+                                        chrom, contig_names,
+                                        ancestry_hmm_path)
+
+
+def contigs_assembly_free(contig_array, all_samples,
+                          genome_size_file, map_length, init_ratio,
+                          ancestry_hmm_path):
+
+    hybrid_names = hdf5_operations.extract_sample_names(all_samples, 'Hybrid')
+
+    genome_size = obtain_genome_size(genome_size_file, contig_array)
+
+    remaining_contigs = np.unique(contig_array[:, 0])
+
+    results = create_chromosome(remaining_contigs, contig_array, hybrid_names)
+    chromosome = results[0]
+    contig_names = results[1]
+
+    chrom = 1
+    calculate_age.infer_age_contigs(chromosome, all_samples,
+                                    genome_size, map_length,
+                                    init_ratio, chrom, contig_names,
+                                    ancestry_hmm_path)
+
+
+def contigs_sim_chroms(contig_array, all_samples,
+                       genome_size_file, num_chromosomes, init_ratio,
+                       ancestry_hmm_path):
+
+    hybrid_names = hdf5_operations.extract_sample_names(all_samples, 'Hybrid')
+
+    genome_size = obtain_genome_size(genome_size_file, contig_array)
+
     chromosome_size = genome_size / num_chromosomes
 
     remaining_contigs = np.unique(contig_array[:, 0])
@@ -55,7 +168,10 @@ def contigs_no_assembly(contig_array, all_samples,
     chrom_bp = 0
     chromosome = np.empty((0, 7 + 2 * len(hybrid_names)))
 
+    map_length = 1.0  # by definition here !
+
     contig_names = []
+    print("starting generating random chromosomes and calculating age")
 
     for contig_iterator in range(0, len(remaining_contigs)):
         focal_contig = remaining_contigs[contig_iterator]
@@ -90,9 +206,10 @@ def contigs_no_assembly(contig_array, all_samples,
                     print("Created artificial chromosome " + str(chrom_num) + " of size " + str(total_chromosome_size))
 
                     # do check for positions not too small:
+
                     calculate_age.infer_age_contigs(chromosome, all_samples,
-                                                    total_chromosome_size, init_ratio,
-                                                    chrom_num, contig_names,
+                                                    total_chromosome_size, map_length,
+                                                    init_ratio, chrom_num, contig_names,
                                                     ancestry_hmm_path)
 
                     chromosome = np.empty((0, 7 + 2 * len(hybrid_names)))
@@ -108,9 +225,10 @@ def contigs_no_assembly(contig_array, all_samples,
                     print("Created artificial chromosome " + str(chrom_num) + " of size " + str(total_chromosome_size))
 
                     calculate_age.infer_age_contigs(chromosome, all_samples,
-                                                    total_chromosome_size, init_ratio,
-                                                    chrom_num, contig_names,
+                                                    total_chromosome_size, map_length,
+                                                    init_ratio, chrom_num, contig_names,
                                                     ancestry_hmm_path)
+
                     chromosome = np.empty((0, 7 + 2 * len(hybrid_names)))
                     contig_names = []
                     chrom_num += 1
@@ -119,49 +237,3 @@ def contigs_no_assembly(contig_array, all_samples,
                 chromosome = np.vstack((chromosome, local_contig_panel))
                 chrom_bp = new_chrom_bp
                 contig_names = np.concatenate((contig_names, contig_name), axis=None)
-
-
-def chrom_contig_list(contig_list, chrom):
-    indices = contig_list[:, 0] == chrom
-    return contig_list[indices, 1]
-
-
-def contigs_with_assembly(contig_array, contig_chrom_assignment, all_names, anc_1_frequency, ancestry_hmm_path):
-
-    hybrid_names = hdf5_operations.extract_sample_names(all_names, 'Hybrid')
-
-    number_of_chromosomes = len(np.unique(contig_chrom_assignment[:, 0]))
-
-    for chrom in range(0, number_of_chromosomes):
-        print("Analyzing Chromosome  " + str(chrom))
-        # take subset of panel with only matching contigs
-        remaining_contigs = chrom_contig_list(contig_chrom_assignment, chrom)
-
-        np.random.shuffle(remaining_contigs)
-
-        chromosome = np.empty((0, 7 + 2 * len(hybrid_names)))
-        contig_names = []
-        chrom_bp = 0
-        for contig_iterator in range(0, len(remaining_contigs)):
-            focal_contig = remaining_contigs[contig_iterator]
-            contig_indices = hdf5_operations.get_contig_indices(contig_array[:, 0], focal_contig)
-            # now we have to get a formatted input panel for these rows
-
-            local_contig_panel = contig_array[contig_indices, ]
-
-            if len(local_contig_panel[:, 0]) > 1:
-                contig_name = np.full(len(local_contig_panel[:, 0]), focal_contig)
-
-                contig_positions = local_contig_panel[:, 1]
-                contig_positions = contig_positions - min(contig_positions) + 1
-                local_contig_panel[:, 0] = 1
-                local_contig_panel[:, 1] = contig_positions + chrom_bp
-                local_contig_panel[:, 6] = contig_positions + chrom_bp
-
-                contig_size = max(contig_positions)
-                chrom_bp += contig_size
-                chromosome = np.vstack((chromosome, local_contig_panel))
-                contig_names = np.concatenate((contig_names, contig_name), axis=None)
-
-        calculate_age.infer_ages_within_contigs(chromosome, all_names, chrom_bp,
-                                                anc_1_frequency, chrom, contig_names, ancestry_hmm_path)
