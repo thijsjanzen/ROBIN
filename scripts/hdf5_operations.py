@@ -71,9 +71,19 @@ def subsample(v, local_limit):
 
     return output
 
+def read_sample_file(file_name):
+    all_names = np.loadtxt(file_name, dtype='str')
+    for i in range(0, len(all_names[:, 1])):
+        x = all_names[i, 1]
+        x = x.lower()
+        all_names[i, 1] = x
+    return all_names
+
 
 def extract_sample_names(array, name):
     indices = array[:, 1] == name
+    if len(indices) < 1:
+        indices = array[:, 1] == name.lower()
     return array[indices, 0]
 
 
@@ -289,17 +299,10 @@ def obtain_hybrid_alleles(local_callset, sample_list, max_read_count, gq_thresho
 
 
 def read_sample_names(file_path):
-    # output_array = []
-    # f = open(file_path)
-    # add_array = []
-    # for word in f.read().split():
-    #    add_array.append(word)
-    #    if len(add_array) == 2:
-    #        output_array.append(add_array)
-    #        add_array = []
-    # return output_array
-    c_array = pandas.read_table(file_path, sep="\t", header=None)
-    output_array = c_array.values
+    output_array = []
+    f = open(file_path)
+    for word in f.read().split():
+        output_array.append(word)
     return output_array
 
 
@@ -346,7 +349,7 @@ def create_input_panel(local_callset, all_names, max_dp, min_gq, min_alleles,
 
 
 def read_existing_panel(panel_path, hybrid_names):
-    c_array = pandas.read_table(panel_path, sep=" ", header=None)
+    c_array = pandas.read_table(panel_path, sep=" ")
     contig_array = c_array.values
     num_columns = 7 + 2 * len(hybrid_names)
     while len(contig_array[0, ]) > num_columns:

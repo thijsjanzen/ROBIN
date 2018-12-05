@@ -73,13 +73,18 @@ def find_contig_order(list_of_contigs):
     return output
 
 
+def get_ancestor_types(array):
+    indices = array[:, 1] == 'Hybrid'
+    return array[indices, 2]
+
+
 def calc_age_contigs(hybrid_result,
                      contig_indices,
                      threshold,
                      initial_heterozygosity,
                      chromosome_size_in_bp,
                      chromosome_size_in_morgan,
-                     sample_number,
+                     ancestor_type,
                      use_local_diff):
 
 #    contig_list1 = find_contig_order(contig_indices)
@@ -94,7 +99,7 @@ def calc_age_contigs(hybrid_result,
         geno = np.full(len(local_indices), -1)
 
         geno[hybrid_result['11'][local_indices] >= (1 - threshold)] = 0
-        if sample_number == 2:
+        if ancestor_type == 2:
             geno[hybrid_result['02'][local_indices] >= (1 - threshold)] = 1
         else:
             geno[hybrid_result['20'][local_indices] >= (1 - threshold)] = 1
@@ -137,10 +142,10 @@ def calc_age_contigs(hybrid_result,
             ages[cnt] = estimate_age_diff(total_number_of_junctions, local_diff,
                                           N, initial_heterozygosity)
        # else:
-        if N == 1000000:
-            ages[cnt] = estimate_age(total_number_of_junctions, all_markers,
-                                     N, chromosome_size_in_morgan, initial_heterozygosity,
-                                     chromosome_size_in_bp)
+        #if N == 1000000:
+        #    ages[cnt] = estimate_age(total_number_of_junctions, all_markers,
+        #                             N, chromosome_size_in_morgan, initial_heterozygosity,
+        #                             chromosome_size_in_bp)
         cnt += 1
     ages[cnt] = total_number_of_junctions
 
@@ -170,6 +175,7 @@ def create_output_panel(hybrid_panel,
                         chromosome_size_in_bp,
                         i,
                         use_contig_index):
+
     local_hybrid_panel = hybrid_panel[:, [(i * 2), (i * 2) + 1]]
 
     local_chrom_indic = np.full(len(allele_matrix[:, 0]), chrom)
@@ -200,8 +206,13 @@ def create_output_panel(hybrid_panel,
 
     diff_pos = np.diff(output[:, 1])
     diff_pos = np.insert(diff_pos, 0, 0)
-    mult = map_length / chromosome_size_in_bp
+    assert(max(diff_pos) > 0)
+    mult = float(map_length) / chromosome_size_in_bp
+    assert(map_length != 0)
+    assert(chromosome_size_in_bp != 0)
+    assert(mult != 0)
     diff_pos = diff_pos * mult
+    assert (max(diff_pos) > 0)
 
     output2 = np.column_stack((output[:, [0, 1, 2, 3, 4, 5]], diff_pos, output[:, [7, 8]]))
     return output2, focal_contigs
@@ -221,6 +232,8 @@ def infer_age_contigs(input_panel,
 
     hybrid_panel = input_panel[:, range(7, len(input_panel[0, ]))]
     allele_matrix = input_panel[:, range(1, 6)]
+
+    ancestor_types = get_ancestor_types(all_names)
 
     for hybrid_index in range(0, len(hybrid_names)):  # type: int
 
@@ -259,7 +272,7 @@ def infer_age_contigs(input_panel,
                                           initial_heterozygosity,
                                           chromosome_size_in_bp,
                                           map_length,
-                                          hybrid_index,
+                                          ancestor_types[hybrid_index],
                                           use_local_diff)
 
             popsize = [1000, 10000, 100000, 1000000]
@@ -280,6 +293,8 @@ def infer_ages_scaffolds(input_panel,
     hybrid_panel = input_panel[:, range(7, len(input_panel[0, ]))]
     allele_matrix = input_panel[:, range(1, 6)]
 
+    ancestor_types = get_ancestor_types(all_names)
+
     for i in range(0, len(hybrid_names)):
 
         map_length = 1
@@ -296,6 +311,7 @@ def infer_ages_scaffolds(input_panel,
         output = local_data[0]
 
         rel_diff = output[:, 6]
+
         assert(max(rel_diff) > 0)
         assert(min(rel_diff) >= 0)
         assert(max(rel_diff) < 1)
@@ -319,7 +335,7 @@ def infer_ages_scaffolds(input_panel,
             geno = np.full(len(hybrid_result), -1)
 
             geno[hybrid_result['11'] >= (1 - threshold)] = 0
-            if i == 2:
+            if ancestor_types[i] == 2:
                 geno[hybrid_result['02'] >= (1 - threshold)] = 1
             else:
                 geno[hybrid_result['20'] >= (1 - threshold)] = 1

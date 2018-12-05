@@ -35,7 +35,7 @@ def main(config_path, random_seed):
     hdf5_path = config['File Names']['hdf5_file']
     panel_path = config['File Names']['panel_file']
     genome_size_file = config['File Names']['genome_size_file']
-    all_names = hdf5_operations.read_sample_names(config['File Names']['sample_list'])
+    all_names = hdf5_operations.read_sample_file(config['File Names']['sample_list'])
     ancestry_hmm_path = config['File Names']['ancestry_hmm']
     contig_assignment_path = config['File Names']['contig_assignment_file']
 
@@ -45,21 +45,23 @@ def main(config_path, random_seed):
         hdf5_operations.create_hdf5_file(vcf_path, hdf5_path)
 
     # either read the panel from file, or create it if necessary:
-    input_panel = hdf5_operations.create_panel(hdf5_path, panel_path, all_names, max_dp, min_gq, min_alleles, analysis)
+    input_panel = hdf5_operations.create_panel(hdf5_path, panel_path,
+                                               all_names, max_dp, min_gq, min_alleles, analysis)
+
+    genome_size = hdf5_operations.calculate_genome_size(hdf5_path, genome_size_file, analysis)
 
     # with all the data available, we now have to calculate local ancestry, and use that to estimate age:
     if analysis == 'assembly_free_chromosomes':
         print("performing assembly_free method assigning contigs to artificial chromosomes")
         contig_analysis.contigs_sim_chroms(input_panel,
-                                           all_names, genome_size_file,
+                                           all_names, genome_size,
                                            num_chromosomes, init_ratio,
                                            ancestry_hmm_path)
 
     if analysis == 'scaffolds':
         print("performing scaffolding based method")
-        total_chromosome_size = max(input_panel[:, 1]) - min(input_panel[:, 1])
 
-        calculate_age.infer_ages_scaffolds(input_panel, all_names, total_chromosome_size,
+        calculate_age.infer_ages_scaffolds(input_panel, all_names, genome_size,
                                            init_ratio, ancestry_hmm_path)
 
     if analysis == 'contigs':
@@ -73,7 +75,7 @@ def main(config_path, random_seed):
         print("performing assembly free method")
         contig_analysis.contigs_assembly_free(input_panel,
                                               all_names,
-                                              genome_size_file,
+                                              genome_size,
                                               total_maplength,
                                               init_ratio,
                                               ancestry_hmm_path)
