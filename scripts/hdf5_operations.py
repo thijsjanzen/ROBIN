@@ -5,6 +5,7 @@ import allel
 import sys
 import pandas
 import os
+import time
 
 
 def is_diagnostic(v, local_limit):
@@ -13,6 +14,10 @@ def is_diagnostic(v, local_limit):
     anc1_allele_2 = v[2]
     anc2_allele_1 = v[3]
     anc2_allele_2 = v[4]
+
+    if sum(v[1:4]) == 0:
+        return False
+
     is_this_snp_diagnostic = False
     if anc1_allele_1 > anc1_allele_2 and anc2_allele_1 < anc2_allele_2:
         is_this_snp_diagnostic = True
@@ -50,6 +55,9 @@ def subsample(v, local_limit):
     anc2_allel_1 = v[3]
     anc2_allel_2 = v[4]
 
+    if sum(v[1:4] == 0):
+        return v
+
     anc1 = [anc1_allel_1, anc1_allel_2]
 
     anc2 = [anc2_allel_1, anc2_allel_2]
@@ -82,20 +90,27 @@ def read_sample_file(file_name):
 
 def extract_sample_names(array, name):
     indices = array[:, 1] == name
-    if len(indices) < 1:
+    output = array[indices, 0]
+    if len(output) < 1:
         indices = array[:, 1] == name.lower()
     return array[indices, 0]
 
 
-def get_contig_indices(array, element):
+def get_contig_indices(array, element, prev_index):
     output = []
-    for i in range(0, len(array)):
+    for i in range(prev_index, len(array)):
         if array[i] == element:
             output.append(i)
         else:
             if len(output) > 0:
                 break
     return output
+
+def get_contig_indices2(array, element):
+    matches = array == element
+    indices = range(0, len(array))
+    return indices[matches]
+
 
 
 def get_contig_list(local_callset):
@@ -374,3 +389,57 @@ def create_panel(hdf5_path, panel_path, all_samples, max_dp, min_gq, min_alleles
         print("panel file saved for future use as:" + panel_path)
         np.savetxt(panel_path, contig_array, fmt=file_fmt)
         return contig_array
+
+
+def calculate_genome_size(hdf5_path, genome_size_file, analysis):
+
+    genome_size = 0
+    if os.path.exists(genome_size_file):
+        input_file = open(genome_size_file, 'r')
+        for val in input_file.read().split():
+            genome_size = int(val)
+        input_file.close()
+        if genome_size > 0:
+            return genome_size
+
+    local_callset = h5py.File(hdf5_path, mode='r')
+    positions = obtain_positions(local_callset)
+    if analysis == 'scaffolds':
+        genome_size = max(positions) - min(positions)
+    else:
+        contigs = local_callset['variants/CHROM']
+        unique_contigs = np.unique(contigs)
+        print("calculating total genome size, this may take a while")
+        bar = progressbar.ProgressBar(maxval=len(unique_contigs)).start()
+        total_bp = 0
+        cnt = 1
+        prev_index = 0
+
+        for local_contig in unique_contigs:
+            indices = contigs == local_contig
+
+            contig_pos = positions[indices]
+
+            to_remove = []
+            for i in range(0, len(contig_pos)):
+                if contig_pos[i] != contig_pos[i]:
+                    to_remove.append(i)
+
+            if len(to_remove) > 0:
+                contig_pos = np.delete(contig_pos, to_remove, 0)
+
+            if len(contig_pos) > 0:
+                if len(indices) > 1:
+                    rel_distance = contig_pos - min(contig_pos)
+                    total_bp += max(rel_distance)
+                if len(indices) == 1:
+                    total_bp += contig_pos[0]
+
+            bar.update(cnt)
+            cnt += 1
+        genome_size = total_bp
+
+    output_file = open(genome_size_file, "w")
+    output_file.write(str(genome_size))
+    output_file.close()
+    return genome_size
