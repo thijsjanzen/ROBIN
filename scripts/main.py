@@ -44,11 +44,13 @@ def main(config_path, random_seed):
     if not os.path.exists(hdf5_path) and not os.path.exists(panel_path):
         hdf5_operations.create_hdf5_file(vcf_path, hdf5_path)
 
+    genome_size = hdf5_operations.calculate_genome_size(hdf5_path, genome_size_file, analysis)
+
     # either read the panel from file, or create it if necessary:
     input_panel = hdf5_operations.create_panel(hdf5_path, panel_path,
                                                all_names, max_dp, min_gq, min_alleles, analysis)
 
-    genome_size = hdf5_operations.calculate_genome_size(hdf5_path, genome_size_file, analysis)
+
 
     # with all the data available, we now have to calculate local ancestry, and use that to estimate age:
     if analysis == 'assembly_free_chromosomes':

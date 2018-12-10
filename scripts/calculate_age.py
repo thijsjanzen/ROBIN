@@ -21,7 +21,7 @@ def calc_detect_j_dist(distances, t, n, h_0):
     detect_j = 0
     for m in range(1, len(distances)):
         dm = distances[m]
-        if dm > 0:
+        if dm > 0 and not np.isnan(dm):
             local_k = 2 * n * h_0 * dm / (2 * n * dm + 1)
             local_j = local_k - local_k * (1 - 1 / (2 * n) - dm) ** t
 
@@ -74,7 +74,13 @@ def find_contig_order(list_of_contigs):
 
 
 def get_ancestor_types(array):
-    indices = array[:, 1] == 'Hybrid'
+    name = 'Hybrid'
+    indices = array[:, 1] == name
+
+    output = array[indices, 2]
+    if len(output) < 1:
+        indices = array[:, 1] == name.lower()
+
     return array[indices, 2]
 
 
@@ -93,13 +99,15 @@ def calc_age_contigs(hybrid_result,
 
     total_number_of_junctions = 0
     all_markers = []
+    prev_index = 0
 
     for contig in contig_list:
-        local_indices = hdf5_operations.get_contig_indices(contig_indices, contig)
+        local_indices = hdf5_operations.get_contig_indices(contig_indices, contig, prev_index)
+        prev_index = local_indices[len(local_indices) - 1]
         geno = np.full(len(local_indices), -1)
 
         geno[hybrid_result['11'][local_indices] >= (1 - threshold)] = 0
-        if ancestor_type == 2:
+        if int(ancestor_type) == 2:
             geno[hybrid_result['02'][local_indices] >= (1 - threshold)] = 1
         else:
             geno[hybrid_result['20'][local_indices] >= (1 - threshold)] = 1

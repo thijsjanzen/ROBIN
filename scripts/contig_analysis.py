@@ -65,14 +65,19 @@ def create_chromosome(remaining_contigs,
                       contig_array,
                       hybrid_names):
 
-    contig_names = []
     chrom_bp = 0
     chromosome = np.empty((0, 7 + 2 * len(hybrid_names)))
 
+    contig_list = contig_array[:, 0]
+
+    contig_names = []
     for contig_iterator in range(0, len(remaining_contigs)):
         focal_contig = remaining_contigs[contig_iterator]
-        contig_indices = hdf5_operations.get_contig_indices(contig_array[:, 0], focal_contig)
+
+        contig_indices = (contig_list == focal_contig)
         # now we have to get a formatted input panel for these rows
+
+        assert(len(contig_indices) == len(contig_array[:, 0]))
 
         local_contig_panel = contig_array[contig_indices, ]
 
@@ -81,7 +86,8 @@ def create_chromosome(remaining_contigs,
             contig_name = np.full(len(local_contig_panel[:, 0]), focal_contig)
 
             contig_positions = local_contig_panel[:, 1]
-            contig_positions = contig_positions - min(contig_positions) + 1
+            local_minimum = min(contig_positions)
+            contig_positions = contig_positions - local_minimum + 1
             local_contig_panel[:, 0] = 1
             local_contig_panel[:, 1] = contig_positions + chrom_bp
             local_contig_panel[:, 6] = contig_positions + chrom_bp
@@ -132,12 +138,12 @@ def contigs_with_assembly(contig_array,
 
 
 def contigs_assembly_free(contig_array, all_samples,
-                          genome_size_file, map_length, init_ratio,
+                          genome_size, map_length, init_ratio,
                           ancestry_hmm_path):
 
     hybrid_names = hdf5_operations.extract_sample_names(all_samples, 'Hybrid')
 
-    genome_size = obtain_genome_size(genome_size_file, contig_array)
+   # genome_size = obtain_genome_size(genome_size_file, contig_array)
 
     remaining_contigs = np.unique(contig_array[:, 0])
 

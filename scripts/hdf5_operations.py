@@ -144,6 +144,15 @@ def convert_if_necessary(input_str):
         return input_str
 
 
+def convert_if_necessary2(input_str):
+    try:
+        input_str.decode()
+        return input_str.decode()
+    except AttributeError:
+        return input_str
+
+
+
 def calc_gq_for_all_samples(array):
     local_gq = np.apply_along_axis(calc_gq_from_pl, 1, array)
     return local_gq
@@ -364,7 +373,7 @@ def create_input_panel(local_callset, all_names, max_dp, min_gq, min_alleles,
 
 
 def read_existing_panel(panel_path, hybrid_names):
-    c_array = pandas.read_table(panel_path, sep=" ")
+    c_array = pandas.read_table(panel_path, sep=" ", header=None)
     contig_array = c_array.values
     num_columns = 7 + 2 * len(hybrid_names)
     while len(contig_array[0, ]) > num_columns:
@@ -397,6 +406,7 @@ def calculate_genome_size(hdf5_path, genome_size_file, analysis):
     if os.path.exists(genome_size_file):
         input_file = open(genome_size_file, 'r')
         for val in input_file.read().split():
+            val = convert_if_necessary(val)
             genome_size = int(val)
         input_file.close()
         if genome_size > 0:
@@ -407,13 +417,12 @@ def calculate_genome_size(hdf5_path, genome_size_file, analysis):
     if analysis == 'scaffolds':
         genome_size = max(positions) - min(positions)
     else:
-        contigs = local_callset['variants/CHROM']
+        contigs = local_callset['variants/CHROM'][:]
         unique_contigs = np.unique(contigs)
         print("calculating total genome size, this may take a while")
         bar = progressbar.ProgressBar(maxval=len(unique_contigs)).start()
         total_bp = 0
         cnt = 1
-        prev_index = 0
 
         for local_contig in unique_contigs:
             indices = contigs == local_contig
@@ -430,8 +439,9 @@ def calculate_genome_size(hdf5_path, genome_size_file, analysis):
 
             if len(contig_pos) > 0:
                 if len(indices) > 1:
-                    rel_distance = contig_pos - min(contig_pos)
-                    total_bp += max(rel_distance)
+                    min_pos = min(contig_pos)
+                    max_pos = max(contig_pos)
+                    total_bp += max_pos - min_pos
                 if len(indices) == 1:
                     total_bp += contig_pos[0]
 
