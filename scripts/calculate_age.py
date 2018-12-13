@@ -90,12 +90,9 @@ def calc_age_contigs(hybrid_result,
                      initial_heterozygosity,
                      chromosome_size_in_bp,
                      chromosome_size_in_morgan,
-                     ancestor_type,
-                     use_local_diff):
+                     ancestor_type):
 
-#    contig_list1 = find_contig_order(contig_indices)
     contig_list = np.unique(contig_indices)
-
 
     total_number_of_junctions = 0
     all_markers = []
@@ -111,6 +108,7 @@ def calc_age_contigs(hybrid_result,
             geno[hybrid_result['02'][local_indices] >= (1 - threshold)] = 1
         else:
             geno[hybrid_result['20'][local_indices] >= (1 - threshold)] = 1
+
 
         informative_markers = geno >= 0
 
@@ -136,9 +134,12 @@ def calc_age_contigs(hybrid_result,
                 print("local diff had negative values, something went wrong")
 
     ages = np.full(5, -1)
+
+
+
     cnt = 0
     for N in [1000, 10000, 100000, 1000000]:
-        if use_local_diff:
+        if len(all_markers) > 0:
             local_diff = np.diff(chromosome_size_in_morgan * all_markers / chromosome_size_in_bp)
             local_diff = np.insert(local_diff, 0, 0)
             if(min(local_diff) < 0.0):
@@ -149,13 +150,9 @@ def calc_age_contigs(hybrid_result,
 
             ages[cnt] = estimate_age_diff(total_number_of_junctions, local_diff,
                                           N, initial_heterozygosity)
-       # else:
-        #if N == 1000000:
-        #    ages[cnt] = estimate_age(total_number_of_junctions, all_markers,
-        #                             N, chromosome_size_in_morgan, initial_heterozygosity,
-        #                             chromosome_size_in_bp)
         cnt += 1
     ages[cnt] = total_number_of_junctions
+
 
     return ages
 
@@ -267,8 +264,6 @@ def infer_age_contigs(input_panel,
         result_file_name = hybrid_names[hybrid_index] + '_' + str(chrom) + '.posterior'
         hybrid_result = np.genfromtxt(result_file_name, names = True)
 
-        use_local_diff = True
-
         # now to calculate J and the distribution of markers
         #for threshold in [0, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]:
         for threshold in [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 0]:
@@ -280,8 +275,7 @@ def infer_age_contigs(input_panel,
                                           initial_heterozygosity,
                                           chromosome_size_in_bp,
                                           map_length,
-                                          ancestor_types[hybrid_index],
-                                          use_local_diff)
+                                          ancestor_types[hybrid_index])
 
             popsize = [1000, 10000, 100000, 1000000]
             f = open("output.txt", "a")
