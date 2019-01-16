@@ -96,55 +96,50 @@ def calc_age_contigs(hybrid_result,
 
     total_number_of_junctions = 0
     all_markers = []
-    prev_index = 0
 
     for contig in contig_list:
-        local_indices = hdf5_operations.get_contig_indices(contig_indices, contig, prev_index)
-        prev_index = local_indices[len(local_indices) - 1]
-        geno = np.full(len(local_indices), -1)
+        local_indices = hdf5_operations.get_contig_indices2(contig_indices, contig)
+        if len(local_indices) > 0:
+            geno = np.full(len(local_indices), -1)
 
-        geno[hybrid_result['11'][local_indices] >= (1 - threshold)] = 0
-        if int(ancestor_type) == 2:
-            geno[hybrid_result['02'][local_indices] >= (1 - threshold)] = 1
-        else:
-            geno[hybrid_result['20'][local_indices] >= (1 - threshold)] = 1
+            geno[hybrid_result['11'][local_indices] >= (1 - threshold)] = 0
+            if int(ancestor_type) == 2:
+                geno[hybrid_result['02'][local_indices] >= (1 - threshold)] = 1
+            else:
+                geno[hybrid_result['20'][local_indices] >= (1 - threshold)] = 1
 
+            informative_markers = geno >= 0
 
-        informative_markers = geno >= 0
+            geno = geno[informative_markers]
+            if len(geno) >= 2:
+                marker_locations = hybrid_result['position'][local_indices]
+                marker_locations = marker_locations[informative_markers]
+                lowest_val = min(marker_locations)
+                marker_locations -= lowest_val
+                if len(all_markers) > 0:
+                    marker_locations += max(all_markers)
+                    assert(marker_locations[0] == max(all_markers))
 
-        geno = geno[informative_markers]
-        if len(geno) >= 2:
-            marker_locations = hybrid_result['position'][local_indices]
-            marker_locations = marker_locations[informative_markers]
-            lowest_val = min(marker_locations)
-            marker_locations -= lowest_val
-            if len(all_markers) > 0:
-                marker_locations += max(all_markers)
-                assert(marker_locations[0] == max(all_markers))
+                all_markers = np.concatenate((all_markers, marker_locations))
 
-            all_markers = np.concatenate((all_markers, marker_locations))
+                number_of_junctions_in_contig = sum(abs(np.diff(geno)))
+                total_number_of_junctions += number_of_junctions_in_contig
 
-            number_of_junctions_in_contig = sum(abs(np.diff(geno)))
-            total_number_of_junctions += number_of_junctions_in_contig
-
-            if min(marker_locations) < 0:
-                local_min = min(marker_locations)
-                focal_index = np.where(marker_locations < 0.0)
-
-                print("local diff had negative values, something went wrong")
+                if min(marker_locations) < 0:
+                    # local_min = min(marker_locations)
+                    # focal_index = np.where(marker_locations < 0.0)
+                    print("local diff had negative values, something went wrong")
 
     ages = np.full(5, -1)
-
-
 
     cnt = 0
     for N in [1000, 10000, 100000, 1000000]:
         if len(all_markers) > 0:
             local_diff = np.diff(chromosome_size_in_morgan * all_markers / chromosome_size_in_bp)
             local_diff = np.insert(local_diff, 0, 0)
-            if(min(local_diff) < 0.0):
-                local_min = min(local_diff)
-                focal_index = np.where(local_diff < 0.0)
+            if min(local_diff) < 0.0:
+                # local_min = min(local_diff)
+                # focal_index = np.where(local_diff < 0.0)
 
                 print("local diff had negative values, something went wrong")
 
@@ -152,7 +147,6 @@ def calc_age_contigs(hybrid_result,
                                           N, initial_heterozygosity)
         cnt += 1
     ages[cnt] = total_number_of_junctions
-
 
     return ages
 
@@ -265,7 +259,7 @@ def infer_age_contigs(input_panel,
         hybrid_result = np.genfromtxt(result_file_name, names = True)
 
         # now to calculate J and the distribution of markers
-        #for threshold in [0, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]:
+        # for threshold in [0, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]:
         for threshold in [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 0]:
             initial_heterozygosity = 2 * anc_1_frequency * (1 - anc_1_frequency)
 
@@ -356,7 +350,7 @@ def infer_ages_scaffolds(input_panel,
             f = open("output.txt", "a")
 
             for N in [1000, 10000, 100000, 1000000]:
-                #final_age1 = estimate_age(num_j, marker_locations, N, map_length, initial_heterozygosity,
+                # final_age1 = estimate_age(num_j, marker_locations, N, map_length, initial_heterozygosity,
                 #                          chromosome_size_in_bp)
 
                 final_age = estimate_age_diff(num_j, local_diff, N, initial_heterozygosity)

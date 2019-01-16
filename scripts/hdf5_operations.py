@@ -104,12 +104,14 @@ def get_contig_indices(array, element, prev_index):
         else:
             if len(output) > 0:
                 break
+
     return output
 
 def get_contig_indices2(array, element):
-    matches = array == element
-    indices = range(0, len(array))
-    return indices[matches]
+    matches = array[:] == element
+    indices = np.arange(0, len(array))
+    output = indices[matches]
+    return output
 
 
 
