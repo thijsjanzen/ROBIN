@@ -1,6 +1,7 @@
 from scipy.optimize import minimize
 import numpy as np
 import hdf5_operations
+import unphased_age
 import os
 
 
@@ -224,7 +225,8 @@ def infer_age_contigs(input_panel,
                       anc_1_frequency,
                       chrom,
                       contig_index,
-                      ancestry_hmm_path):
+                      ancestry_hmm_path,
+                      phasing):
     # now we have the basics of the inputfile for ANCESTRY_HMM
     # lets add the hybrids and write file
     hybrid_names = hdf5_operations.extract_sample_names(all_names, 'Hybrid')
@@ -263,27 +265,44 @@ def infer_age_contigs(input_panel,
         for threshold in [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 0]:
             initial_heterozygosity = 2 * anc_1_frequency * (1 - anc_1_frequency)
 
-            found_ages = calc_age_contigs(hybrid_result,
-                                          focal_contigs,
-                                          threshold,
-                                          initial_heterozygosity,
-                                          chromosome_size_in_bp,
-                                          map_length,
-                                          ancestor_types[hybrid_index])
+            if phasing == "phased":
+                found_ages = calc_age_contigs(hybrid_result,
+                                              focal_contigs,
+                                              threshold,
+                                              initial_heterozygosity,
+                                              chromosome_size_in_bp,
+                                              map_length,
+                                              ancestor_types[hybrid_index])
 
-            popsize = [1000, 10000, 100000, 1000000]
-            f = open("output.txt", "a")
-            for k in range(0, 4):
-                f.write(hybrid_names[hybrid_index] + "\t" + str(chrom) + "\t" + str(threshold) +
-                        "\t" + str(popsize[k]) + "\t" + str(found_ages[4]) + "\t" + str(found_ages[k]) + "\n")
-            f.close()
+                popsize = [1000, 10000, 100000, 1000000]
+                f = open("output.txt", "a")
+                for k in range(0, 4):
+                    f.write(hybrid_names[hybrid_index] + "\t" + str(chrom) + "\t" + str(threshold) +
+                            "\t" + str(popsize[k]) + "\t" + str(found_ages[4]) + "\t" + str(found_ages[k]) + "\n")
+                f.close()
+
+            if phasing == "unphased":
+                found_ages = unphased_age.calc_age_contigs_unphased(hybrid_result,
+                                                                    focal_contigs,
+                                                                    threshold,
+                                                                    initial_heterozygosity,
+                                                                    chromosome_size_in_bp,
+                                                                    map_length)
+
+                popsize = [1000, 10000, 100000, 1000000]
+                f = open("output.txt", "a")
+                for k in range(0, 4):
+                    f.write(hybrid_names[hybrid_index] + "\t" + str(chrom) + "\t" + str(threshold) +
+                            "\t" + str(popsize[k]) + "\t" + str(found_ages[4]) + "\t" + str(found_ages[k]) + "\n")
+                f.close()
 
 
 def infer_ages_scaffolds(input_panel,
                          all_names,
                          chromosome_size_in_bp,
                          anc_1_frequency,
-                         ancestry_hmm_path):
+                         ancestry_hmm_path,
+                         phasing):
     hybrid_names = hdf5_operations.extract_sample_names(all_names, 'Hybrid')
 
     hybrid_panel = input_panel[:, range(7, len(input_panel[0, ]))]
@@ -328,34 +347,57 @@ def infer_ages_scaffolds(input_panel,
 
         # now to calculate J and the distribution of markers
         for threshold in [0, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]:
-            geno = np.full(len(hybrid_result), -1)
 
-            geno[hybrid_result['11'] >= (1 - threshold)] = 0
-            if ancestor_types[i] == 2:
-                geno[hybrid_result['02'] >= (1 - threshold)] = 1
-            else:
+            if phasing == "phased":
+                geno = np.full(len(hybrid_result), -1)
+
+                geno[hybrid_result['11'] >= (1 - threshold)] = 0
+                if int(ancestor_types[i]) == 2:
+                    geno[hybrid_result['02'] >= (1 - threshold)] = 1
+                else:
+                    geno[hybrid_result['20'] >= (1 - threshold)] = 1
+
+                informative_markers = geno >= 0
+                geno = geno[informative_markers]
+                num_j = sum(abs(np.diff(geno)))
+                marker_locations = hybrid_result['position']
+                marker_locations = marker_locations[informative_markers]
+
+                local_diff = np.diff(marker_locations / chromosome_size_in_bp)
+                local_diff = np.insert(local_diff, 0, 0)
+
+                initial_heterozygosity = 2 * anc_1_frequency * (1 - anc_1_frequency)
+
+                f = open("output.txt", "a")
+
+                for N in [1000, 10000, 100000, 1000000]:
+                    final_age = estimate_age_diff(num_j, local_diff, N, initial_heterozygosity)
+
+                    f.write(hybrid_names[i] + "\t" + str(threshold) + "\t" + str(N) + "\t" + str(num_j) + "\t" + str(
+                        final_age) + "\n")
+
+                f.close()
+
+            if phasing == "unphased":
+                geno = np.full(len(hybrid_result), -1)
+                geno[hybrid_result['11'] >= (1 - threshold)] = 2
+                geno[hybrid_result['02'] >= (1 - threshold)] = 0
                 geno[hybrid_result['20'] >= (1 - threshold)] = 1
 
-            informative_markers = geno >= 0
-            geno = geno[informative_markers]
-            num_j = sum(abs(np.diff(geno)))
-            marker_locations = hybrid_result['position']
-            marker_locations = marker_locations[informative_markers]
+                informative_markers = geno >= 0
+                geno = geno[informative_markers]
+                marker_locations = hybrid_result['position']
+                marker_locations = marker_locations[informative_markers]
 
-            local_diff = np.diff(marker_locations / chromosome_size_in_bp)
-            local_diff = np.insert(local_diff, 0, 0)
+                local_diff = np.diff(marker_locations / chromosome_size_in_bp)
 
-            initial_heterozygosity = 2 * anc_1_frequency * (1 - anc_1_frequency)
+                initial_heterozygosity = 2 * anc_1_frequency * (1 - anc_1_frequency)
 
-            f = open("output.txt", "a")
+                f = open("output.txt", "a")
 
-            for N in [1000, 10000, 100000, 1000000]:
-                # final_age1 = estimate_age(num_j, marker_locations, N, map_length, initial_heterozygosity,
-                #                          chromosome_size_in_bp)
+                for N in [1000, 10000, 100000, 1000000]:
+                    final_age = unphased_age.estimate_age_unphased(geno, local_diff, N, initial_heterozygosity)
 
-                final_age = estimate_age_diff(num_j, local_diff, N, initial_heterozygosity)
-
-                f.write(hybrid_names[i] + "\t" + str(threshold) + "\t" + str(N) + "\t" + str(num_j) + "\t" + str(
-                    final_age) + "\n")
-
-            f.close()
+                    f.write(hybrid_names[i] + "\t" + str(threshold) + "\t" + str(N) + "\t" + str(final_age[0]) + "\t" +
+                            str(final_age[1]) + "\n")
+                f.close()

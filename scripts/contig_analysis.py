@@ -14,7 +14,7 @@ def calc_genome_size(local_contig_array):
     total_bp = 0
     cnt = 1
     for local_contig in unique_contigs:
-        indices = hdf5_operations.get_contig_indices(local_contig_column[:], local_contig)
+        indices = hdf5_operations.get_contig_indices2(local_contig_column[:], local_contig)
 
         contig_pos = local_contig_array[:, 1]
         contig_pos = contig_pos[indices]
@@ -28,7 +28,6 @@ def calc_genome_size(local_contig_array):
             contig_pos = np.delete(contig_pos, to_remove, 0)
 
         if len(contig_pos) > 0:
-            rel_distance = 0
             if len(indices) > 1:
                 rel_distance = contig_pos - min(contig_pos)
                 total_bp += max(rel_distance)
@@ -110,7 +109,8 @@ def contigs_with_assembly(contig_array,
                           contig_chrom_assignment,
                           all_names,
                           anc_1_frequency,
-                          ancestry_hmm_path):
+                          ancestry_hmm_path,
+                          phasing):
 
     hybrid_names = hdf5_operations.extract_sample_names(all_names, 'Hybrid')
 
@@ -134,16 +134,16 @@ def contigs_with_assembly(contig_array,
                                         genome_size, map_length,
                                         anc_1_frequency,
                                         chrom, contig_names,
-                                        ancestry_hmm_path)
+                                        ancestry_hmm_path,
+                                        phasing)
 
 
 def contigs_assembly_free(contig_array, all_samples,
                           genome_size, map_length, init_ratio,
-                          ancestry_hmm_path):
+                          ancestry_hmm_path,
+                          phasing):
 
     hybrid_names = hdf5_operations.extract_sample_names(all_samples, 'Hybrid')
-
-   # genome_size = obtain_genome_size(genome_size_file, contig_array)
 
     remaining_contigs = np.unique(contig_array[:, 0])
 
@@ -155,12 +155,14 @@ def contigs_assembly_free(contig_array, all_samples,
     calculate_age.infer_age_contigs(chromosome, all_samples,
                                     genome_size, map_length,
                                     init_ratio, chrom, contig_names,
-                                    ancestry_hmm_path)
+                                    ancestry_hmm_path,
+                                    phasing)
 
 
 def contigs_sim_chroms(contig_array, all_samples,
                        genome_size_file, num_chromosomes, init_ratio,
-                       ancestry_hmm_path):
+                       ancestry_hmm_path,
+                       phasing):
 
     hybrid_names = hdf5_operations.extract_sample_names(all_samples, 'Hybrid')
 
@@ -181,7 +183,7 @@ def contigs_sim_chroms(contig_array, all_samples,
 
     for contig_iterator in range(0, len(remaining_contigs)):
         focal_contig = remaining_contigs[contig_iterator]
-        contig_indices = hdf5_operations.get_contig_indices(contig_array[:, 0], focal_contig)
+        contig_indices = hdf5_operations.get_contig_indices2(contig_array[:, 0], focal_contig)
         # now we have to get a formatted input panel for these rows
 
         local_contig_panel = contig_array[contig_indices, ]

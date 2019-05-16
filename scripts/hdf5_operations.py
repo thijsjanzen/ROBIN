@@ -1,3 +1,4 @@
+from __future__ import division
 import h5py
 import numpy as np
 import progressbar
@@ -12,25 +13,29 @@ def is_diagnostic(v, local_limit):
     # pos = v[0] #just for completeness
     anc1_allele_1 = v[1]
     anc1_allele_2 = v[2]
+
     anc2_allele_1 = v[3]
     anc2_allele_2 = v[4]
 
-    if sum(v[1:4]) == 0:
+    num_alleles_anc_1 = anc1_allele_1 + anc1_allele_2
+    num_alleles_anc_2 = anc2_allele_1 + anc2_allele_2
+
+    if num_alleles_anc_1  < local_limit:
         return False
 
-    is_this_snp_diagnostic = False
-    if anc1_allele_1 > anc1_allele_2 and anc2_allele_1 < anc2_allele_2:
-        is_this_snp_diagnostic = True
-    if anc1_allele_1 < anc1_allele_2 and anc2_allele_1 > anc2_allele_2:
-        is_this_snp_diagnostic = True
+    if num_alleles_anc_2  < local_limit:
+        return False
 
-    if (anc1_allele_1 + anc1_allele_2) < local_limit:
-        is_this_snp_diagnostic = False
+    p_x = anc1_allele_1 / num_alleles_anc_1
 
-    if (anc2_allele_1 + anc2_allele_2) < local_limit:
-        is_this_snp_diagnostic = False
+    p_y = anc2_allele_1 / num_alleles_anc_2
 
-    return is_this_snp_diagnostic
+    delta = abs(p_x - p_y)
+
+    if delta > 0.5:
+        return True
+
+    return False
 
 
 def reduce_sample(v, factor, target_total):
@@ -55,9 +60,6 @@ def subsample(v, local_limit):
     anc2_allel_1 = v[3]
     anc2_allel_2 = v[4]
 
-    if sum(v[1:4] == 0):
-        return v
-
     anc1 = [anc1_allel_1, anc1_allel_2]
 
     anc2 = [anc2_allel_1, anc2_allel_2]
@@ -65,15 +67,18 @@ def subsample(v, local_limit):
     num_anc1_alleles = sum(anc1)
     num_anc2_alleles = sum(anc2)
 
-    if num_anc1_alleles >= local_limit:
-        if num_anc2_alleles >= local_limit:
-            if num_anc1_alleles > num_anc2_alleles:
-                anc1 = reduce_sample(anc1, num_anc1_alleles / num_anc2_alleles, num_anc2_alleles)
-            elif num_anc2_alleles > num_anc1_alleles:
-                anc2 = reduce_sample(anc2, num_anc2_alleles / num_anc1_alleles, num_anc1_alleles)
+    if num_anc1_alleles < local_limit:
+        return v
+    if num_anc2_alleles < local_limit:
+        return v
 
-            # now the number of alleles should be identical
-            assert (sum(anc1) == sum(anc2))
+    if num_anc1_alleles > num_anc2_alleles:
+        anc1 = reduce_sample(anc1, num_anc1_alleles / num_anc2_alleles, num_anc2_alleles)
+    elif num_anc2_alleles > num_anc1_alleles:
+        anc2 = reduce_sample(anc2, num_anc2_alleles / num_anc1_alleles, num_anc1_alleles)
+
+    # now the number of alleles should be identical
+    assert (sum(anc1) == sum(anc2))
 
     output = np.array([pos, anc1[0], anc1[1], anc2[0], anc2[1]])
 
@@ -355,7 +360,14 @@ def create_input_panel(local_callset, all_names, max_dp, min_gq, min_alleles,
 
     # and then we check which ones are diagnostic
     print("removing non-diagnostic SNPs")
+
     markers_to_keep = np.apply_along_axis(is_diagnostic, 1, allele_matrix2, local_limit=min_alleles)
+
+
+    #check_output = np.column_stack((allele_matrix2, markers_to_keep))
+    #file_fmt = '%s %i %i %i %i %i'
+    
+    #np.savetxt("sanity.txt", check_output, fmt=file_fmt)
 
     allele_matrix3 = allele_matrix2[markers_to_keep, ]
 
