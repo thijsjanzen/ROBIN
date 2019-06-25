@@ -34,7 +34,8 @@ def calc_detect_j_dist(distances, t, n, h_0):
 def estimate_age_diff(num_j,
                       distances,
                       population_size,
-                      initial_heterozygosity):
+                      initial_heterozygosity,
+                      start_val):
 
     if len(distances) < 1:
         return -1
@@ -44,7 +45,7 @@ def estimate_age_diff(num_j,
                                  population_size, initial_heterozygosity)
         return abs(d_j - num_j)
 
-    res = minimize(to_fit, x0=np.array([200]), method='nelder-mead', options={'xtol': 1e-8, 'disp': False})
+    res = minimize(to_fit, x0=np.array([start_val]), method='nelder-mead', options={'xtol': 1e-8, 'disp': False})
     return res.x[0]
 
 
@@ -134,6 +135,7 @@ def calc_age_contigs(hybrid_result,
     ages = np.full(5, -1)
 
     cnt = 0
+    start_val = 200
     for N in [1000, 10000, 100000, 1000000]:
         if len(all_markers) > 0:
             local_diff = np.diff(chromosome_size_in_morgan * all_markers / chromosome_size_in_bp)
@@ -144,8 +146,11 @@ def calc_age_contigs(hybrid_result,
 
                 print("local diff had negative values, something went wrong")
 
+            if cnt > 0:
+                start_val = ages[cnt - 1]
+
             ages[cnt] = estimate_age_diff(total_number_of_junctions, local_diff,
-                                          N, initial_heterozygosity)
+                                          N, initial_heterozygosity, start_val)
         cnt += 1
     ages[cnt] = total_number_of_junctions
 
@@ -369,9 +374,10 @@ def infer_ages_scaffolds(input_panel,
                 initial_heterozygosity = 2 * anc_1_frequency * (1 - anc_1_frequency)
 
                 f = open("output.txt", "a")
-
+                prev_estim = 200
                 for N in [1000, 10000, 100000, 1000000]:
-                    final_age = estimate_age_diff(num_j, local_diff, N, initial_heterozygosity)
+                    final_age = estimate_age_diff(num_j, local_diff, N, initial_heterozygosity, prev_estim)
+                    prev_estim = final_age
 
                     f.write(hybrid_names[i] + "\t" + str(threshold) + "\t" + str(N) + "\t" + str(num_j) + "\t" + str(
                         final_age) + "\n")
@@ -394,10 +400,10 @@ def infer_ages_scaffolds(input_panel,
                 initial_heterozygosity = 2 * anc_1_frequency * (1 - anc_1_frequency)
 
                 f = open("output.txt", "a")
-
+                prev_estim = 200
                 for N in [1000, 10000, 100000, 1000000]:
-                    final_age = unphased_age.estimate_age_unphased(geno, local_diff, N, initial_heterozygosity)
-
+                    final_age = unphased_age.estimate_age_unphased(geno, local_diff, N, initial_heterozygosity, prev_estim)
+                    prev_estim = final_age
                     f.write(hybrid_names[i] + "\t" + str(threshold) + "\t" + str(N) + "\t" + str(final_age[0]) + "\t" +
                             str(final_age[1]) + "\n")
                 f.close()

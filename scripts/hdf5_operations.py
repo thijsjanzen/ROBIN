@@ -1,4 +1,3 @@
-from __future__ import division
 import h5py
 import numpy as np
 import progressbar
@@ -6,7 +5,6 @@ import allel
 import sys
 import pandas
 import os
-import time
 
 
 def is_diagnostic(v, local_limit):
@@ -17,18 +15,18 @@ def is_diagnostic(v, local_limit):
     anc2_allele_1 = v[3]
     anc2_allele_2 = v[4]
 
-    num_alleles_anc_1 = anc1_allele_1 + anc1_allele_2
-    num_alleles_anc_2 = anc2_allele_1 + anc2_allele_2
-
-    if num_alleles_anc_1  < local_limit:
+    if anc1_allele_1 + anc1_allele_2 < local_limit:
+        return False
+    if anc2_allele_1 + anc2_allele_2 < local_limit:
         return False
 
-    if num_alleles_anc_2  < local_limit:
+    if anc1_allele_1 + anc1_allele_2 == 0:
+        return False
+    if anc2_allele_1 + anc2_allele_2 == 0:
         return False
 
-    p_x = anc1_allele_1 / num_alleles_anc_1
-
-    p_y = anc2_allele_1 / num_alleles_anc_2
+    p_x = anc1_allele_1 / (anc1_allele_1 + anc1_allele_2)
+    p_y = anc2_allele_1 / (anc2_allele_1 + anc2_allele_2)
 
     delta = abs(p_x - p_y)
 
@@ -72,6 +70,11 @@ def subsample(v, local_limit):
     if num_anc2_alleles < local_limit:
         return v
 
+    if num_anc1_alleles == 0:
+        return v
+    if num_anc2_alleles == 0:
+        return v
+
     if num_anc1_alleles > num_anc2_alleles:
         anc1 = reduce_sample(anc1, num_anc1_alleles / num_anc2_alleles, num_anc2_alleles)
     elif num_anc2_alleles > num_anc1_alleles:
@@ -83,6 +86,7 @@ def subsample(v, local_limit):
     output = np.array([pos, anc1[0], anc1[1], anc2[0], anc2[1]])
 
     return output
+
 
 def read_sample_file(file_name):
     all_names = np.loadtxt(file_name, dtype='str')
@@ -112,12 +116,12 @@ def get_contig_indices(array, element, prev_index):
 
     return output
 
+
 def get_contig_indices2(array, element):
     matches = array[:] == element
     indices = np.arange(0, len(array))
     output = indices[matches]
     return output
-
 
 
 def get_contig_list(local_callset):
@@ -157,7 +161,6 @@ def convert_if_necessary2(input_str):
         return input_str.decode()
     except AttributeError:
         return input_str
-
 
 
 def calc_gq_for_all_samples(array):
@@ -205,16 +208,21 @@ def create_hdf5_file(vcf_path, hdf5_file_name):
     if get_other_dp == 1:
         print("Found no DP entries, reconstructing DP from RR and VR\n")
         rr = local_callset['calldata/RR']
-        vr = local_callset['calldata/VR']
-        new_dp = rr[:] + vr[:]
-        if np.amax(new_dp[:]) == -1:
-            print("Failed to reconstruct DP entries from RR and VR\n")
-            print("Please reformat your VCF to include DP\n")
-            print("exiting\n")
-            exit(1)
+        rr2 = rr[:]
+        local_rr = rr2[0]
 
-        data = local_callset['calldata/DP']
-        data[...] = new_dp[:]
+        if not np.any(local_rr):
+            print("It appears that DP information can not be reconstructed\n")
+            print("Discarding the option to filter for sufficient DP\n")
+        else:
+            vr = local_callset['calldata/VR']
+            new_dp = rr[:] + vr[:]
+            if np.amax(new_dp[:]) == -1:
+                print("Failed to reconstruct DP entries from RR and VR\n")
+                print("Please reformat your VCF to include DP\n")
+
+            data = local_callset['calldata/DP']
+            data[...] = new_dp[:]
 
     gq = local_callset['calldata/GQ']
     if np.amax(gq[:] == -1):
@@ -360,14 +368,7 @@ def create_input_panel(local_callset, all_names, max_dp, min_gq, min_alleles,
 
     # and then we check which ones are diagnostic
     print("removing non-diagnostic SNPs")
-
     markers_to_keep = np.apply_along_axis(is_diagnostic, 1, allele_matrix2, local_limit=min_alleles)
-
-
-    #check_output = np.column_stack((allele_matrix2, markers_to_keep))
-    #file_fmt = '%s %i %i %i %i %i'
-    
-    #np.savetxt("sanity.txt", check_output, fmt=file_fmt)
 
     allele_matrix3 = allele_matrix2[markers_to_keep, ]
 
