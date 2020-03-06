@@ -307,6 +307,7 @@ def infer_ages_scaffolds(input_panel,
                          chromosome_size_in_bp,
                          anc_1_frequency,
                          ancestry_hmm_path,
+                         kb_per_cm,
                          phasing):
     hybrid_names = hdf5_operations.extract_sample_names(all_names, 'Hybrid')
 
@@ -317,7 +318,8 @@ def infer_ages_scaffolds(input_panel,
 
     for i in range(0, len(hybrid_names)):
 
-        map_length = 1
+        num_kb = chromosome_size_in_bp / 1000
+        map_length = num_kb / (kb_per_cm / 100)
         chrom = 1
         use_contig_index = False
         contig_index = []
@@ -368,7 +370,7 @@ def infer_ages_scaffolds(input_panel,
                 marker_locations = hybrid_result['position']
                 marker_locations = marker_locations[informative_markers]
 
-                local_diff = np.diff(marker_locations / chromosome_size_in_bp)
+                local_diff = np.diff(map_length * marker_locations / chromosome_size_in_bp)
                 local_diff = np.insert(local_diff, 0, 0)
 
                 initial_heterozygosity = 2 * anc_1_frequency * (1 - anc_1_frequency)
@@ -395,7 +397,7 @@ def infer_ages_scaffolds(input_panel,
                 marker_locations = hybrid_result['position']
                 marker_locations = marker_locations[informative_markers]
 
-                local_diff = np.diff(marker_locations / chromosome_size_in_bp)
+                local_diff = np.diff(map_length * marker_locations / chromosome_size_in_bp)
 
                 initial_heterozygosity = 2 * anc_1_frequency * (1 - anc_1_frequency)
 

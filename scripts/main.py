@@ -28,6 +28,7 @@ def main(config_path, random_seed):
     init_ratio = float(config['Parameters']['freq_ancestor_1'])
     num_chromosomes = int(config['Parameters']['number_of_chromosomes'])
     total_maplength = float(config['Parameters']['total_map_length_of_genome'])
+    kb_per_cm = float(config['Parameters']['kb_per_cm'])
 
     np.random.seed(int(random_seed))
 
@@ -59,6 +60,7 @@ def main(config_path, random_seed):
                                            all_names, genome_size,
                                            num_chromosomes, init_ratio,
                                            ancestry_hmm_path,
+                                           kb_per_cm,
                                            phasing)
 
     if analysis == 'scaffolds':
@@ -66,6 +68,7 @@ def main(config_path, random_seed):
 
         calculate_age.infer_ages_scaffolds(input_panel, all_names, genome_size,
                                            init_ratio, ancestry_hmm_path,
+                                           kb_per_cm,
                                            phasing)
 
     if analysis == 'contigs':
