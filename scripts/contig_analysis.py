@@ -110,7 +110,7 @@ def contigs_with_assembly(contig_array,
                           all_names,
                           anc_1_frequency,
                           ancestry_hmm_path,
-                          recom_rate_per_kb,
+                          kb_per_cm,
                           phasing):
 
     hybrid_names = hdf5_operations.extract_sample_names(all_names, 'Hybrid')
@@ -130,7 +130,7 @@ def contigs_with_assembly(contig_array,
         genome_size = results[2]
 
         num_kb = genome_size / 1000
-        map_length = (recom_rate_per_kb / 100) * num_kb  # / 100 to go from cM to M
+        map_length = (num_kb / kb_per_cm) / 100  # / 100 to go from cM to M  # / 100 to go from cM to M
 
         calculate_age.infer_age_contigs(chromosome, all_names,
                                         genome_size, map_length,
@@ -141,7 +141,7 @@ def contigs_with_assembly(contig_array,
 
 
 def contigs_assembly_free(contig_array, all_samples,
-                          genome_size, map_length, init_ratio,
+                          genome_size, map_length, kb_per_cm, init_ratio,
                           ancestry_hmm_path,
                           phasing):
 
@@ -155,7 +155,7 @@ def contigs_assembly_free(contig_array, all_samples,
 
     chrom = 1
     calculate_age.infer_age_contigs(chromosome, all_samples,
-                                    genome_size, map_length,
+                                    genome_size, map_length, kb_per_cm,
                                     init_ratio, chrom, contig_names,
                                     ancestry_hmm_path,
                                     phasing)
@@ -178,8 +178,6 @@ def contigs_sim_chroms(contig_array, all_samples,
     chrom_num = 1
     chrom_bp = 0
     chromosome = np.empty((0, 7 + 2 * len(hybrid_names)))
-
-
 
     contig_names = []
     print("starting generating random chromosomes and calculating age")
@@ -218,7 +216,7 @@ def contigs_sim_chroms(contig_array, all_samples,
 
                     # do check for positions not too small:
                     num_kb = chromosome_size / 1000
-                    map_length = num_kb / (kb_per_cm / 100)   # / 100 to go from cM to M
+                    map_length = (num_kb / kb_per_cm) / 100   # / 100 to go from cM to M
 
                     calculate_age.infer_age_contigs(chromosome, all_samples,
                                                     total_chromosome_size, map_length,
@@ -238,7 +236,7 @@ def contigs_sim_chroms(contig_array, all_samples,
                     print("Created artificial chromosome " + str(chrom_num) + " of size " + str(total_chromosome_size))
 
                     num_kb = chromosome_size / 1000
-                    map_length = num_kb / (kb_per_cm / 100)
+                    map_length = (num_kb / kb_per_cm) / 100
 
                     calculate_age.infer_age_contigs(chromosome, all_samples,
                                                     total_chromosome_size, map_length,

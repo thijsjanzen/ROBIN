@@ -163,13 +163,24 @@ def run_ancestry_hmm(ancestry_hmm_path,
                      sample_file_name):
     anc_2_frequency = 1 - anc_1_frequency
 
+    # check if ancestry_hmm exists
+    if not os.path.isfile(ancestry_hmm_path):
+        print("can not find ancestry_hmm, stopping")
+        print("was looking here: ")
+        print('./' + ancestry_hmm_path)
+        exit()
+
+
     # now we can call ancestry_hmm
     command = './' + ancestry_hmm_path + ' -i ' + file_name + ' -s ' + \
               sample_file_name + ' -a 2 ' + str(anc_1_frequency) + ' ' + str(anc_2_frequency) + \
-              ' -p 0 100000 ' + str(anc_1_frequency) + ' -p 1 -200 ' + str(anc_1_frequency) + ' -g >/dev/null 2>&1'
+              ' -p 0 100000 ' + str(anc_1_frequency) + ' -p 1 -200 ' + str(anc_2_frequency) + ' -g >/dev/null 2>&1'
 
     os.system(command)
     return
+
+
+
 
 
 def create_output_panel(hybrid_panel,
@@ -178,6 +189,7 @@ def create_output_panel(hybrid_panel,
                         contig_index,
                         map_length,
                         chromosome_size_in_bp,
+                        kb_per_cm,
                         i,
                         use_contig_index):
 
@@ -212,7 +224,12 @@ def create_output_panel(hybrid_panel,
     diff_pos = np.diff(output[:, 1])
     diff_pos = np.insert(diff_pos, 0, 0)
     assert(max(diff_pos) > 0)
+    if kb_per_cm != 0:
+        num_kb = chromosome_size_in_bp / 1000
+        map_length = (num_kb / (kb_per_cm)) / 100
+
     mult = float(map_length) / chromosome_size_in_bp
+
     assert(map_length != 0)
     assert(chromosome_size_in_bp != 0)
     assert(mult != 0)
@@ -227,6 +244,7 @@ def infer_age_contigs(input_panel,
                       all_names,
                       chromosome_size_in_bp,
                       map_length,
+                      kb_per_cm,
                       anc_1_frequency,
                       chrom,
                       contig_index,
@@ -246,7 +264,7 @@ def infer_age_contigs(input_panel,
         use_contig_index = True
         local_data = create_output_panel(hybrid_panel, allele_matrix,
                                          chrom, contig_index,
-                                         map_length, chromosome_size_in_bp,
+                                         map_length, chromosome_size_in_bp, kb_per_cm,
                                          hybrid_index, use_contig_index)
         output = local_data[0]
         focal_contigs = local_data[1]
@@ -319,7 +337,7 @@ def infer_ages_scaffolds(input_panel,
     for i in range(0, len(hybrid_names)):
 
         num_kb = chromosome_size_in_bp / 1000
-        map_length = num_kb / (kb_per_cm / 100)
+        map_length = (num_kb / (kb_per_cm)) / 100
         chrom = 1
         use_contig_index = False
         contig_index = []
@@ -353,7 +371,7 @@ def infer_ages_scaffolds(input_panel,
         hybrid_result = np.genfromtxt(result_file_name, names=True)
 
         # now to calculate J and the distribution of markers
-        for threshold in [0, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]:
+        for threshold in  [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]:  #[1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]:  #  [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]:
 
             if phasing == "phased":
                 geno = np.full(len(hybrid_result), -1)
@@ -402,10 +420,9 @@ def infer_ages_scaffolds(input_panel,
                 initial_heterozygosity = 2 * anc_1_frequency * (1 - anc_1_frequency)
 
                 f = open("output.txt", "a")
-                prev_estim = 200
+                init_estim = 200
                 for N in [1000, 10000, 100000, 1000000]:
-                    final_age = unphased_age.estimate_age_unphased(geno, local_diff, N, initial_heterozygosity, prev_estim)
-                    prev_estim = final_age
+                    final_age = unphased_age.estimate_age_unphased(geno, local_diff, N, initial_heterozygosity, init_estim)
                     f.write(hybrid_names[i] + "\t" + str(threshold) + "\t" + str(N) + "\t" + str(final_age[0]) + "\t" +
                             str(final_age[1]) + "\n")
                 f.close()

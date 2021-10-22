@@ -1,3 +1,4 @@
+from __future__ import division
 import h5py
 import numpy as np
 import progressbar
@@ -5,6 +6,7 @@ import allel
 import sys
 import pandas
 import os
+
 
 
 def is_diagnostic(v, local_limit):
@@ -362,15 +364,15 @@ def create_input_panel(local_callset, all_names, max_dp, min_gq, min_alleles,
 
     allele_matrix = np.column_stack((positions, anc1_panel, anc2_panel))
 
-    # we first subsample
-    print("subsampling to obtain equal allele counts")
-    allele_matrix2 = np.apply_along_axis(subsample, 1, allele_matrix, local_limit=min_alleles)
-
-    # and then we check which ones are diagnostic
+    # first we check which ones are diagnostic
     print("removing non-diagnostic SNPs")
-    markers_to_keep = np.apply_along_axis(is_diagnostic, 1, allele_matrix2, local_limit=min_alleles)
+    markers_to_keep = np.apply_along_axis(is_diagnostic, 1, allele_matrix, local_limit=min_alleles)
 
-    allele_matrix3 = allele_matrix2[markers_to_keep, ]
+    allele_matrix2 = allele_matrix[markers_to_keep, ]
+
+    # we first subsample
+    print("then we subsample to obtain equal allele counts")
+    allele_matrix3 = np.apply_along_axis(subsample, 1, allele_matrix2, local_limit=min_alleles)
 
     chrom_indicator = np.full(len(markers_to_keep), 1)
 

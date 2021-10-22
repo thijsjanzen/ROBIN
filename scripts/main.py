@@ -85,6 +85,7 @@ def main(config_path, random_seed):
                                               all_names,
                                               genome_size,
                                               total_maplength,
+                                              kb_per_cm,
                                               init_ratio,
                                               ancestry_hmm_path,
                                               phasing)
