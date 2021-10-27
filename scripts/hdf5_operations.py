@@ -227,6 +227,9 @@ def create_hdf5_file(vcf_path, hdf5_file_name):
             data[...] = new_dp[:]
 
     gq = local_callset['calldata/GQ']
+
+    temp = gq[:]
+
     if np.amax(gq[:] == -1):
         print("Found no GQ entries, reconstructing GQ from PL\n")
         pl = local_callset['calldata/PL']
@@ -364,11 +367,19 @@ def create_input_panel(local_callset, all_names, max_dp, min_gq, min_alleles,
 
     allele_matrix = np.column_stack((positions, anc1_panel, anc2_panel))
 
+   # file_fmt = '%i %i %i %i %i'
+   # np.savetxt("intermediate.txt", allele_matrix, fmt=file_fmt)
+
     # first we check which ones are diagnostic
     print("removing non-diagnostic SNPs")
     markers_to_keep = np.apply_along_axis(is_diagnostic, 1, allele_matrix, local_limit=min_alleles)
 
     allele_matrix2 = allele_matrix[markers_to_keep, ]
+
+    if not allele_matrix2:
+        print("\nunfortunately, after removing non-diagnostic SNPs, ")
+        print("it seems there are no diagnostic SNPs remaining in the dataset")
+        exit(0)
 
     # we first subsample
     print("then we subsample to obtain equal allele counts")
